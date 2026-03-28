@@ -183,6 +183,20 @@
             padding: 8px;
         }
 
+		.sidebar-filter { padding: 8px 12px; }
+		.sidebar-filter input {
+		  width: 100%;
+		  padding: 7px 10px;
+		  background: var(--input);
+		  color: var(--text);
+		  border: 1px solid var(--border);
+		  border-radius: 6px;
+		  font-size: 12px;
+		}
+		.sidebar-filter input:focus {
+		  border-color: var(--accent);
+		}
+		
         .table-item {
             padding: 8px 12px;
             border-radius: 6px;
@@ -1091,23 +1105,28 @@
         <!-- MAIN -->
         <div class="main-area">
             <!-- SIDEBAR -->
-            <div class="sidebar">
-                <div class="sidebar-header">Tables</div>
-                <div class="sidebar-content" id="tableList">
-                    <div class="no-tables" id="noTables">No tables loaded</div>
-                </div>
-            </div>
+				  <div class="sidebar" id="sidebar">
+					<div class="sidebar-header">
+					  <span> SQLite Viewer</span>
+					</div>
+					<div class="sidebar-filter" style="margin: 8px 0; padding: 0 8px;">
+					  <input type="text" placeholder="Filter tables…" id="tableFilter" oninput="filterTables()">
+					</div>
+					<div class="table-list" id="tableList">
+					  <div class="sidebar-empty">No tables loaded</div>
+					</div>
+				  </div>
 
             <!-- CONTENT -->
             <div class="content-area">
                 <!-- TABS -->
                 <div class="tabs">
                     <div class="tab active" id="tabContent" onclick="switchTab('content')">Content</div>
-                    <div class="tab" id="tabQuery" onclick="switchTab('query')">Query</div>
-                    <div class="tab" id="tabGlobalSearch" onclick="switchTab('globalSearch')">
+					<div class="tab" id="tabGlobalSearch" onclick="switchTab('globalSearch')">
                         🔍 Global Search
-                        <span class="badge" id="globalSearchBadge" style="display:none">0</span>
+                    <span class="badge" id="globalSearchBadge" style="display:none">0</span>
                     </div>
+                    <div class="tab" id="tabQuery" onclick="switchTab('query')">Query</div>
                 </div>
 
                 <!-- DROPZONE (shown when no DB is loaded) -->
@@ -1131,7 +1150,6 @@
                         <div id="search-mode-badge" style="display:none;font-size:11px;padding:3px 8px;border-radius:12px;font-weight:600;"></div>
                         <div id="search-status" style="font-size:12px;color:var(--text-secondary);white-space:nowrap;"></div>
                         <div style="flex:1"></div>
-                        <button class="btn" id="ftsToggleBtn" onclick="toggleFtsMode()" title="Enable FTS5 full-text search for this table">⚡ FTS5</button>
                         <button class="btn" id="wrapToggleBtn" onclick="toggleWrapText()" title="Toggle text wrapping">⇌ Wrap Text</button>
                         <button class="btn" onclick="exportCSV()">↓ CSV</button>
                     </div>
@@ -2120,6 +2138,26 @@
             document.querySelector('.content-area').prepend(div);
             setTimeout(() => div.remove(), 5000);
         }
+
+		function filterTables() {
+		  const input = document.getElementById('tableFilter');
+		  if (!input) return;
+		  const q = input.value.toLowerCase();
+		  document.querySelectorAll('.table-item').forEach(el => {
+			const name = (el.dataset.name || el.textContent || '').trim().toLowerCase();
+			el.style.display = name.includes(q) ? 'flex' : 'none';
+		  });
+		}
+
+		// Also ensure the input has the listener attached (even if created dynamically)
+		const observer = new MutationObserver(() => {
+		  const input = document.getElementById('tableFilter');
+		  if (input && !input.dataset.listenerAdded) {
+			input.addEventListener('input', filterTables);
+			input.dataset.listenerAdded = 'true';
+		  }
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
 
         // Start auth flow
         initAuth();
