@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%; margin: 0; padding: 0;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQLite Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js" crossorigin>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --bg-tertiary: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #d1d5db;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --sidebar-width: 250px;
+            --header-height: 48px;
+            --footer-height: 36px;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        .dark {
+            --bg-primary: #1f2937;
+            --bg-secondary: #111827;
+            --bg-tertiary: #374151;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --border-color: #4b5563;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --success: #4ade80;
+            --warning: #fbbf24;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: var(--header-height);
+            min-height: var(--header-height);
+            padding: 0 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .header-file {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-icon {
+            padding: 6px 8px;
+            font-size: 16px;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #fff;
+            border-color: var(--warning);
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+            border-color: var(--success);
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        /* MAIN AREA */
+        .main-area {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 12px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .table-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            transition: background 0.15s;
+        }
+
+        .table-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .table-item.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .table-icon {
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .no-tables {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* CONTENT AREA */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* TABS */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            margin-left: 6px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 9px;
+        }
+
+        /* QUERY PANEL */
+        .query-panel {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .query-panel.active {
+            display: flex;
+        }
+
+        .query-editor-wrapper {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .query-editor {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        .query-editor:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .query-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        .query-toolbar-left {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .query-toolbar-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .kbd {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* DATA PANEL */
+        .data-panel {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .data-panel.active {
+            display: flex;
+        }
+
+        /* GLOBAL SEARCH PANEL */
+        .global-search-panel {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .global-search-panel.active {
+            display: flex;
+        }
+
+        .global-search-header {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .global-search-input-wrap {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+            margin-bottom: 12px;
+        }
+
+        .global-search-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+
+        .global-search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .global-search-options {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .search-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .global-search-results {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .global-search-summary {
+            display: flex;
+            gap: 16px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .global-search-summary strong {
+            color: var(--text-primary);
+        }
+
+        .table-result-group {
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .table-result-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .table-result-header.collapsed {
+            border-bottom: none;
+        }
+
+        .table-result-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .table-result-count {
+            background: var(--accent);
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .table-result-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .table-result-content {
+            max-height: 400px;
+            overflow: auto;
+        }
+
+        .table-result-content.collapsed {
+            display: none;
+        }
+
+        .no-results {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .no-results-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .search-progress {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        /* TABLE DISPLAY */
+        .table-wrapper {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+            z-index: 1;
+        }
+
+        .data-table td {
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border-color);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-table.wrap-text td {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow: visible;
+            text-overflow: unset;
+            max-width: 400px;
+            vertical-align: top;
+        }
+
+        .btn-wrap-active {
+            background: var(--accent) !important;
+            color: #fff !important;
+            border-color: var(--accent) !important;
+        }
+
+        .data-table tr:hover td {
+            background: var(--bg-secondary);
+        }
+
+        .data-table tr.match-row {
+            background: rgba(59,130,246,0.05);
+        }
+
+        .data-table tr.match-row:hover td {
+            background: rgba(59,130,246,0.1);
+        }
+
+        /* DROP ZONE */
+        .dropzone-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .dropzone-box {
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 60px 40px;
+            max-width: 500px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .dropzone-box:hover,
+        .dropzone-box.drag-over {
+            border-color: var(--accent);
+            background: rgba(59,130,246,0.05);
+        }
+
+        .dropzone-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        .dropzone-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .dropzone-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .dropzone-hint {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* FOOTER */
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: var(--footer-height);
+            min-height: var(--footer-height);
+            padding: 0 16px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .footer-left, .footer-right {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            display: inline-block;
+        }
+
+        .status-dot.connected {
+            background: #22c55e;
+        }
+
+        .result-info {
+            padding: 8px 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .error-msg {
+            padding: 12px 14px;
+            background: #fef2f2;
+            color: #dc2626;
+            font-size: 13px;
+            border-bottom: 1px solid #fecaca;
+        }
+
+        .dark .error-msg {
+            background: #450a0a;
+            color: #fca5a5;
+            border-color: #7f1d1d;
+        }
+
+        /* Search bar in data view */
+        .data-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .search-input {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            width: 200px;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+        }
+
+        /* LOGIN SCREEN */
+        #login-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            z-index: 1000;
+        }
+
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .login-logo-icon {
+            font-size: 36px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .login-logo h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 0;
+        }
+
+        .login-logo p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 4px 0 0;
+        }
+
+        .login-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 20px 0;
+        }
+
+        .login-field {
+            margin-bottom: 16px;
+        }
+
+        .login-field label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .login-input-wrap {
+            position: relative;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 10px 40px 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .login-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .login-input.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239,68,68,0.15);
+        }
+
+        .toggle-pw {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 16px;
+            padding: 2px;
+            line-height: 1;
+        }
+
+        .toggle-pw:hover { color: var(--text-primary); }
+
+        .login-error {
+            display: none;
+            font-size: 12px;
+            color: #ef4444;
+            margin-top: 6px;
+            padding: 8px 10px;
+            background: rgba(239,68,68,0.08);
+            border-radius: 6px;
+            border: 1px solid rgba(239,68,68,0.2);
+        }
+
+        .login-error.show { display: block; }
+
+        .login-btn {
+            width: 100%;
+            padding: 11px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.15s, transform 0.1s;
+        }
+
+        .login-btn:hover { background: var(--accent-hover); }
+        .login-btn:active { transform: scale(0.98); }
+
+        .login-hint {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .login-hint a {
+            color: var(--accent);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .login-hint a:hover { text-decoration: underline; }
+
+        /* CHANGE PASSWORD MODAL */
+        #pw-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #pw-modal.show { display: flex; }
+
+        .pw-modal-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 28px;
+            width: 340px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .pw-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .pw-modal-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .pw-modal-close {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            line-height: 1;
+            padding: 2px;
+        }
+
+        .pw-modal-close:hover { color: var(--text-primary); }
+
+        .pw-success {
+            display: none;
+            font-size: 12px;
+            color: #16a34a;
+            margin-top: 6px;
+            padding: 8px 10px;
+            background: rgba(22,163,74,0.08);
+            border-radius: 6px;
+            border: 1px solid rgba(22,163,74,0.2);
+        }
+
+        .pw-success.show { display: block; }
+
+        /* Lock icon in header */
+        .header-lock {
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .header-lock:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        mark {
+            background: #fef08a;
+            color: #713f12;
+            border-radius: 2px;
+            padding: 0 2px;
+            font-weight: 600;
+        }
+
+        .dark mark {
+            background: rgba(251, 191, 36, 0.3);
+            color: #fbbf24;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="login-logo-icon">🗄</span>
+                <h1>SQLite Viewer</h1>
+                <p>Enter your password to continue</p>
+            </div>
+            <div class="login-divider"></div>
+            <div class="login-field">
+                <label>Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="login-pw-input" placeholder="Enter password…" onkeydown="if(event.key==='Enter')doLogin()">
+                    <button class="toggle-pw" onclick="togglePwVis('login-pw-input', this)" tabindex="-1">👁</button>
+                </div>
+                <div class="login-error" id="login-error">Incorrect password. Please try again.</div>
+            </div>
+            <button class="login-btn" onclick="doLogin()">Unlock →</button>
+            <div class="login-hint">First time? <a onclick="showSetupMode()">Set a password</a></div>
+        </div>
+    </div>
+
+    <!-- SETUP MODE (first-time password set) -->
+    <div id="setup-screen" style="display:none;position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg-primary);z-index:1000;">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="login-logo-icon">🔐</span>
+                <h1>Set Password</h1>
+                <p>Create a password to protect this viewer</p>
+            </div>
+            <div class="login-divider"></div>
+            <div class="login-field">
+                <label>New Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="setup-pw1" placeholder="Choose a password…">
+                    <button class="toggle-pw" onclick="togglePwVis('setup-pw1', this)" tabindex="-1">👁</button>
+                </div>
+            </div>
+            <div class="login-field">
+                <label>Confirm Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="setup-pw2" placeholder="Repeat password…" onkeydown="if(event.key==='Enter')doSetup()">
+                    <button class="toggle-pw" onclick="togglePwVis('setup-pw2', this)" tabindex="-1">👁</button>
+                </div>
+                <div class="login-error" id="setup-error"></div>
+            </div>
+            <button class="login-btn" onclick="doSetup()">Save Password →</button>
+            <div class="login-hint"><a onclick="showLoginMode()">← Back to login</a></div>
+        </div>
+    </div>
+
+    <!-- CHANGE PASSWORD MODAL -->
+    <div id="pw-modal">
+        <div class="pw-modal-card">
+            <div class="pw-modal-header">
+                <span class="pw-modal-title">🔑 Change Password</span>
+                <button class="pw-modal-close" onclick="closePwModal()">✕</button>
+            </div>
+            <div class="login-field">
+                <label>Current Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="modal-pw-old" placeholder="Current password…">
+                    <button class="toggle-pw" onclick="togglePwVis('modal-pw-old', this)" tabindex="-1">👁</button>
+                </div>
+            </div>
+            <div class="login-field">
+                <label>New Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="modal-pw-new" placeholder="New password…">
+                    <button class="toggle-pw" onclick="togglePwVis('modal-pw-new', this)" tabindex="-1">👁</button>
+                </div>
+            </div>
+            <div class="login-field">
+                <label>Confirm New Password</label>
+                <div class="login-input-wrap">
+                    <input class="login-input" type="password" id="modal-pw-confirm" placeholder="Repeat new password…" onkeydown="if(event.key==='Enter')doChangePw()">
+                    <button class="toggle-pw" onclick="togglePwVis('modal-pw-confirm', this)" tabindex="-1">👁</button>
+                </div>
+                <div class="login-error" id="modal-error"></div>
+                <div class="pw-success" id="modal-success">✓ Password changed successfully!</div>
+            </div>
+            <button class="login-btn" onclick="doChangePw()">Update Password</button>
+        </div>
+    </div>
+
+    <div class="app-container" id="app" style="display:none;">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-left">
+                <span class="header-title">🗄 SQLite Viewer</span>
+                <span class="header-file" id="headerFile">No database</span>
+            </div>
+            <div class="header-right">
+                <button class="btn" id="openBtn" onclick="document.getElementById('fileInput').click()">📂 Open a .sqlite file</button>
+                <button class="header-lock" onclick="openPwModal()" title="Change password">🔑</button>
+                <button class="header-lock" onclick="doLogout()" title="Lock / Logout">🔒 Lock</button>
+                <button class="btn btn-icon" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">☀</button>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="main-area">
+            <!-- SIDEBAR -->
+            <div class="sidebar">
+                <div class="sidebar-header">Tables</div>
+                <div class="sidebar-content" id="tableList">
+                    <div class="no-tables" id="noTables">No tables loaded</div>
+                </div>
+            </div>
+
+            <!-- CONTENT -->
+            <div class="content-area">
+                <!-- TABS -->
+                <div class="tabs">
+                    <div class="tab active" id="tabContent" onclick="switchTab('content')">Content</div>
+                    <div class="tab" id="tabQuery" onclick="switchTab('query')">Query</div>
+                    <div class="tab" id="tabGlobalSearch" onclick="switchTab('globalSearch')">
+                        🔍 Global Search
+                        <span class="badge" id="globalSearchBadge" style="display:none">0</span>
+                    </div>
+                </div>
+
+                <!-- DROPZONE (shown when no DB is loaded) -->
+                <div class="dropzone-overlay" id="dropzone">
+                    <div class="dropzone-box" id="dropzoneBox" onclick="document.getElementById('fileInput').click()">
+                        <div class="dropzone-icon">📁</div>
+                        <div class="dropzone-title">Open a SQLite database</div>
+                        <div class="dropzone-subtitle">Drag & drop your .sqlite, .db, or .sqlite3 file here</div>
+                        <button class="btn btn-primary">Browse file</button>
+                        <div class="dropzone-hint">🔒 Processed entirely in your browser — nothing is uploaded</div>
+                    </div>
+                </div>
+
+                <!-- DATA PANEL (Content tab) -->
+                <div class="data-panel" id="dataPanel">
+                    <div class="data-toolbar">
+                        <div style="position:relative;flex:1;max-width:420px;">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.4;">🔍</span>
+                            <input class="search-input" type="text" placeholder="Search data…" id="filterInput" oninput="onSearchInput()" style="padding-left:32px;width:100%;">
+                        </div>
+                        <div id="search-mode-badge" style="display:none;font-size:11px;padding:3px 8px;border-radius:12px;font-weight:600;"></div>
+                        <div id="search-status" style="font-size:12px;color:var(--text-secondary);white-space:nowrap;"></div>
+                        <div style="flex:1"></div>
+                        <button class="btn" id="ftsToggleBtn" onclick="toggleFtsMode()" title="Enable FTS5 full-text search for this table">⚡ FTS5</button>
+                        <button class="btn" id="wrapToggleBtn" onclick="toggleWrapText()" title="Toggle text wrapping">⇌ Wrap Text</button>
+                        <button class="btn" onclick="exportCSV()">↓ CSV</button>
+                    </div>
+                    <div id="fts-info-bar" style="display:none;padding:6px 14px;font-size:12px;background:var(--bg-secondary);border-bottom:1px solid var(--border-color);color:var(--text-secondary);display:none;align-items:center;gap:10px;">
+                        <span>⚡ <strong>FTS5 active</strong> — supports phrases <code style="background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;">"exact phrase"</code>, prefix <code style="background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;">word*</code>, boolean <code style="background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;">AND OR NOT</code>, ranked by relevance</span>
+                        <span id="fts-build-status" style="margin-left:auto;"></span>
+                    </div>
+                    <div class="table-wrapper" id="dataTableWrapper">
+                    </div>
+                </div>
+
+                <!-- QUERY PANEL -->
+                <div class="query-panel" id="queryPanel">
+                    <div class="query-editor-wrapper">
+                        <textarea class="query-editor" id="queryEditor" placeholder="Write a SQL query here...">SELECT * FROM sqlite_master;</textarea>
+                        <div class="query-toolbar">
+                            <div class="query-toolbar-left">
+                                <span class="kbd">Ctrl+Enter</span>
+                                <span style="font-size:12px;color:var(--text-secondary)">to run</span>
+                            </div>
+                            <div class="query-toolbar-right">
+                                <button class="btn btn-primary" onclick="runQuery()">▶ Run</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="queryResult" class="table-wrapper" style="flex:1;overflow:auto;">
+                        <div style="padding:30px;text-align:center;color:var(--text-secondary);">Write a SQL query above and press Run</div>
+                    </div>
+                </div>
+
+                <!-- GLOBAL SEARCH PANEL -->
+                <div class="global-search-panel" id="globalSearchPanel">
+                    <div class="global-search-header">
+                        <div class="global-search-input-wrap">
+                            <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search across all tables..." onkeydown="if(event.key==='Enter')runGlobalSearch()">
+                            <button class="btn btn-primary" onclick="runGlobalSearch()">🔍 Search All Tables</button>
+                            <button class="btn" onclick="clearGlobalSearch()">Clear</button>
+                        </div>
+                        <div class="global-search-options">
+                            <label class="search-option">
+                                <input type="checkbox" id="globalSearchFts" checked>
+                                <span>Use FTS5 (faster, supports phrases/boolean)</span>
+                            </label>
+                            <label class="search-option">
+                                <input type="checkbox" id="globalSearchLimit" checked>
+                                <span>Limit to 100 rows per table</span>
+                            </label>
+                            <label class="search-option">
+                                <input type="checkbox" id="globalSearchAuto" checked>
+                                <span>Auto-search on type</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="global-search-summary" id="globalSearchSummary" style="display:none;">
+                        <span>Found <strong id="totalMatches">0</strong> matches in <strong id="tablesSearched">0</strong> tables</span>
+                        <span style="margin-left:auto;">Search time: <strong id="searchTime">0ms</strong></span>
+                    </div>
+                    <div class="search-progress" id="searchProgress" style="display:none;">
+                        <span>Searching...</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                        </div>
+                        <span id="progressText">0/0</span>
+                    </div>
+                    <div class="global-search-results" id="globalSearchResults">
+                        <div class="no-results">
+                            <div class="no-results-icon">🔍</div>
+                            <div>Enter a search term above to search across all tables</div>
+                            <div style="font-size:12px;margin-top:8px;opacity:0.7;">Results will appear here grouped by table</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <div class="footer-left">
+                <span><span class="status-dot" id="statusDot"></span> <span id="statusText">Disconnected</span></span>
+            </div>
+            <div class="footer-right">
+                <span>File: <strong id="footerFile">—</strong></span>
+                <span>Table: <strong id="footerTable">—</strong></span>
+                <span>Rows: <strong id="footerRows">—</strong></span>
+                <span>Cols: <strong id="footerCols">—</strong></span>
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" accept=".sqlite,.db,.sqlite3,.sql" onchange="handleFile(event)">
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <script>
+        // ── AUTH ──────────────────────────────────────────────────────────
+        const PW_KEY = 'sqlite_viewer_pw';
+        const SESSION_KEY = 'sqlite_viewer_session';
+        const DEFAULT_PW = 'admin123';
+
+        function hashPw(pw) {
+            let h = 0;
+            for (let i = 0; i < pw.length; i++) h = (Math.imul(31, h) + pw.charCodeAt(i)) | 0;
+            return btoa(pw + '::' + Math.abs(h).toString(16));
+        }
+
+        function getSavedPw() { return localStorage.getItem(PW_KEY) || hashPw(DEFAULT_PW); }
+        function isLoggedIn() { return sessionStorage.getItem(SESSION_KEY) === '1'; }
+
+        function initAuth() {
+            if (isLoggedIn()) { showApp(); return; }
+            const hasPw = !!localStorage.getItem(PW_KEY);
+            if (!hasPw) {
+                showSetupMode();
+            } else {
+                showLoginMode();
+            }
+        }
+
+        function showApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+        }
+
+        function showLoginMode() {
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex';
+            setTimeout(() => document.getElementById('login-pw-input').focus(), 50);
+        }
+
+        function showSetupMode() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'flex';
+            setTimeout(() => document.getElementById('setup-pw1').focus(), 50);
+        }
+
+        function doLogin() {
+            const input = document.getElementById('login-pw-input').value;
+            const errEl = document.getElementById('login-error');
+            const inputEl = document.getElementById('login-pw-input');
+            if (hashPw(input) === getSavedPw()) {
+                sessionStorage.setItem(SESSION_KEY, '1');
+                errEl.classList.remove('show');
+                inputEl.classList.remove('error');
+                document.getElementById('login-pw-input').value = '';
+                showApp();
+            } else {
+                errEl.classList.add('show');
+                inputEl.classList.add('error');
+                inputEl.focus();
+                inputEl.select();
+            }
+        }
+
+        function doSetup() {
+            const pw1 = document.getElementById('setup-pw1').value;
+            const pw2 = document.getElementById('setup-pw2').value;
+            const errEl = document.getElementById('setup-error');
+            if (!pw1 || pw1.length < 4) {
+                errEl.textContent = 'Password must be at least 4 characters.';
+                errEl.classList.add('show');
+                return;
+            }
+            if (pw1 !== pw2) {
+                errEl.textContent = 'Passwords do not match.';
+                errEl.classList.add('show');
+                document.getElementById('setup-pw2').classList.add('error');
+                return;
+            }
+            localStorage.setItem(PW_KEY, hashPw(pw1));
+            sessionStorage.setItem(SESSION_KEY, '1');
+            errEl.classList.remove('show');
+            document.getElementById('setup-pw1').value = '';
+            document.getElementById('setup-pw2').value = '';
+            showApp();
+        }
+
+        function doLogout() {
+            sessionStorage.removeItem(SESSION_KEY);
+            db = null;
+            document.getElementById('app').style.display = 'none';
+            showLoginMode();
+        }
+
+        function openPwModal() {
+            document.getElementById('modal-pw-old').value = '';
+            document.getElementById('modal-pw-new').value = '';
+            document.getElementById('modal-pw-confirm').value = '';
+            document.getElementById('modal-error').classList.remove('show');
+            document.getElementById('modal-success').classList.remove('show');
+            document.querySelectorAll('#pw-modal .login-input').forEach(el => el.classList.remove('error'));
+            document.getElementById('pw-modal').classList.add('show');
+            setTimeout(() => document.getElementById('modal-pw-old').focus(), 50);
+        }
+
+        function closePwModal() {
+            document.getElementById('pw-modal').classList.remove('show');
+        }
+
+        function doChangePw() {
+            const old = document.getElementById('modal-pw-old').value;
+            const nw = document.getElementById('modal-pw-new').value;
+            const cf = document.getElementById('modal-pw-confirm').value;
+            const errEl = document.getElementById('modal-error');
+            const okEl = document.getElementById('modal-success');
+            errEl.classList.remove('show'); okEl.classList.remove('show');
+            document.querySelectorAll('#pw-modal .login-input').forEach(el => el.classList.remove('error'));
+            if (hashPw(old) !== getSavedPw()) {
+                errEl.textContent = 'Current password is incorrect.';
+                errEl.classList.add('show');
+                document.getElementById('modal-pw-old').classList.add('error');
+                return;
+            }
+            if (!nw || nw.length < 4) {
+                errEl.textContent = 'New password must be at least 4 characters.';
+                errEl.classList.add('show');
+                document.getElementById('modal-pw-new').classList.add('error');
+                return;
+            }
+            if (nw !== cf) {
+                errEl.textContent = 'New passwords do not match.';
+                errEl.classList.add('show');
+                document.getElementById('modal-pw-confirm').classList.add('error');
+                return;
+            }
+            localStorage.setItem(PW_KEY, hashPw(nw));
+            okEl.classList.add('show');
+            document.getElementById('modal-pw-old').value = '';
+            document.getElementById('modal-pw-new').value = '';
+            document.getElementById('modal-pw-confirm').value = '';
+            setTimeout(closePwModal, 1800);
+        }
+
+        function togglePwVis(inputId, btn) {
+            const inp = document.getElementById(inputId);
+            if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+            else { inp.type = 'password'; btn.textContent = '👁'; }
+        }
+
+        document.getElementById('pw-modal').addEventListener('click', function(e) {
+            if (e.target === this) closePwModal();
+        });
+
+        // ── APP ───────────────────────────────────────────────────────────
+        let db = null;
+        let currentTable = null;
+        let currentData = { columns: [], values: [] };
+        let isDark = false;
+        let allTables = []; // Store all table names
+
+        // Init SQL.js
+        let SQL;
+        initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(sqljs) {
+            SQL = sqljs;
+        });
+
+        // Theme
+        function toggleTheme() {
+            isDark = !isDark;
+            document.documentElement.classList.toggle('dark', isDark);
+            document.getElementById('themeToggle').textContent = isDark ? '🌙' : '☀';
+        }
+
+        // Tabs
+        function switchTab(tab) {
+            document.getElementById('tabContent').classList.toggle('active', tab === 'content');
+            document.getElementById('tabQuery').classList.toggle('active', tab === 'query');
+            document.getElementById('tabGlobalSearch').classList.toggle('active', tab === 'globalSearch');
+            
+            document.getElementById('dataPanel').classList.toggle('active', tab === 'content' && db !== null);
+            document.getElementById('queryPanel').classList.toggle('active', tab === 'query');
+            document.getElementById('globalSearchPanel').classList.toggle('active', tab === 'globalSearch');
+            
+            if (tab === 'content' && !db) {
+                document.getElementById('dropzone').style.display = 'flex';
+            } else if (tab === 'content' && db) {
+                document.getElementById('dropzone').style.display = 'none';
+            } else {
+                document.getElementById('dropzone').style.display = 'none';
+            }
+
+            if (tab === 'globalSearch' && db) {
+                setTimeout(() => document.getElementById('globalSearchInput').focus(), 100);
+            }
+        }
+
+        // Drag & Drop
+        const dropzoneBox = document.getElementById('dropzoneBox');
+        document.addEventListener('dragover', e => { e.preventDefault(); dropzoneBox.classList.add('drag-over'); });
+        document.addEventListener('dragleave', e => { dropzoneBox.classList.remove('drag-over'); });
+        document.addEventListener('drop', e => {
+            e.preventDefault();
+            dropzoneBox.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (file) loadFile(file);
+        }
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const Uints = new Uint8Array(reader.result);
+                try {
+                    db = new SQL.Database(Uints);
+                    document.getElementById('headerFile').textContent = file.name;
+                    document.getElementById('footerFile').textContent = file.name;
+                    document.getElementById('statusDot').classList.add('connected');
+                    document.getElementById('statusText').textContent = 'Connected';
+                    loadTables();
+                    document.getElementById('dropzone').style.display = 'none';
+                } catch(err) {
+                    showError('Failed to open database: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function loadTables() {
+            if (!db) return;
+            const res = db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;");
+            const list = document.getElementById('tableList');
+            list.innerHTML = '';
+            allTables = [];
+            
+            if (res.length > 0 && res[0].values.length > 0) {
+                res[0].values.forEach(row => {
+                    const name = row[0];
+                    allTables.push(name);
+                    const div = document.createElement('div');
+                    div.className = 'table-item';
+                    div.innerHTML = '<span class="table-icon">📋</span>' + name;
+                    div.onclick = () => selectTable(name);
+                    list.appendChild(div);
+                });
+                // Auto-select first table
+                selectTable(res[0].values[0][0]);
+            } else {
+                list.innerHTML = '<div class="no-tables">No tables found</div>';
+            }
+        }
+
+        function selectTable(name, keepSearch) {
+            currentTable = name;
+            // Highlight sidebar
+            document.querySelectorAll('.table-item').forEach(el => {
+                el.classList.toggle('active', el.textContent === name);
+            });
+
+            // Load data
+            try {
+                const res = db.exec('SELECT * FROM "' + name.replace(/"/g,'""') + '";');
+                if (res.length > 0) {
+                    currentData = res[0];
+                    renderTable(currentData, 'dataTableWrapper');
+                    document.getElementById('footerTable').textContent = name;
+                    document.getElementById('footerRows').textContent = currentData.values.length;
+                    document.getElementById('footerCols').textContent = currentData.columns.length;
+                } else {
+                    currentData = { columns: [], values: [] };
+                    document.getElementById('dataTableWrapper').innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-secondary);">Table is empty</div>';
+                    document.getElementById('footerTable').textContent = name;
+                    document.getElementById('footerRows').textContent = '0';
+                    document.getElementById('footerCols').textContent = '0';
+                }
+                document.getElementById('dataPanel').classList.add('active');
+                document.getElementById('dropzone').style.display = 'none';
+                switchTab('content');
+                if (!keepSearch) resetFts();
+            } catch(err) {
+                showError('Error loading table: ' + err.message);
+            }
+        }
+
+        function renderTable(data, containerId, highlightTerm) {
+            const wrapper = document.getElementById(containerId);
+            if (!data || !data.columns || data.columns.length === 0) {
+                wrapper.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-secondary);">No results</div>';
+                return;
+            }
+            
+            const terms = highlightTerm ? highlightTerm.split(/\s+/).filter(Boolean) : [];
+            let html = '<table class="data-table"><thead><tr>';
+            data.columns.forEach(col => {
+                html += '<th>' + escapeHtml(col) + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+            data.values.forEach((row, idx) => {
+                html += '<tr class="match-row">';
+                row.forEach(cell => {
+                    if (cell === null) {
+                        html += '<td><span style="color:var(--text-secondary);font-style:italic">NULL</span></td>';
+                    } else {
+                        const str = String(cell);
+                        const URL_REGEX = /^(https?:\/\/|www\.)[^\s/$.?#].[^\s]*$/i;
+                        if (URL_REGEX.test(str.trim())) {
+                            html += '<td>' + formatCellValue(cell) + '</td>';
+                        } else {
+                            let cellHtml = escapeHtml(str);
+                            if (terms.length > 0) {
+                                cellHtml = highlightTerms(cellHtml, terms);
+                            }
+                            html += '<td>' + cellHtml + '</td>';
+                        }
+                    }
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            wrapper.innerHTML = html;
+            if (wrapText) {
+                const t = wrapper.querySelector('.data-table');
+                if (t) t.classList.add('wrap-text');
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        const URL_REGEX = /^(https?:\/\/|www\.)[^\s/$.?#].[^\s]*$/i;
+
+        function formatCellValue(cell) {
+            if (cell === null) return '<span style="color:var(--text-secondary);font-style:italic">NULL</span>';
+            const str = String(cell);
+            if (URL_REGEX.test(str.trim())) {
+                const href = str.trim().startsWith('http') ? str.trim() : 'https://' + str.trim();
+                return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;border-bottom:1px solid transparent;" onmouseover="this.style.borderBottomColor=\'var(--accent)\'" onmouseout="this.style.borderBottomColor=\'transparent\'">' + escapeHtml(str) + ' <span style="font-size:10px;opacity:0.6;">↗</span></a>';
+            }
+            return escapeHtml(str);
+        }
+
+        // Query
+        function runQuery() {
+            if (!db) {
+                document.getElementById('queryResult').innerHTML = '<div class="error-msg">No database loaded. Please open a .sqlite file first.</div>';
+                return;
+            }
+            const sql = document.getElementById('queryEditor').value.trim();
+            if (!sql) return;
+            try {
+                const results = db.exec(sql);
+                if (results.length > 0) {
+                    let html = '<div class="result-info">' + results[0].values.length + ' row(s) returned</div>';
+                    html += '<div style="flex:1;overflow:auto;">';
+                    html += '<table class="data-table"><thead><tr>';
+                    results[0].columns.forEach(col => html += '<th>' + escapeHtml(col) + '</th>');
+                    html += '</tr></thead><tbody>';
+                    results[0].values.forEach(row => {
+                        html += '<tr>';
+                        row.forEach(cell => {
+                            html += '<td>' + formatCellValue(cell) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    document.getElementById('queryResult').innerHTML = html;
+                } else {
+                    document.getElementById('queryResult').innerHTML = '<div class="result-info">Query executed successfully. No rows returned.</div>';
+                }
+            } catch(err) {
+                document.getElementById('queryResult').innerHTML = '<div class="error-msg">Error: ' + escapeHtml(err.message) + '</div>';
+            }
+        }
+
+        document.getElementById('queryEditor').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                runQuery();
+            }
+        });
+
+        // ── GLOBAL SEARCH ENGINE ──────────────────────────────────────────
+        let globalSearchResults = [];
+        let isSearching = false;
+
+        // Auto-search on type
+        document.getElementById('globalSearchInput').addEventListener('input', function() {
+            if (document.getElementById('globalSearchAuto').checked) {
+                clearTimeout(window.globalSearchTimer);
+                window.globalSearchTimer = setTimeout(() => {
+                    const q = this.value.trim();
+                    if (q.length >= 2) runGlobalSearch();
+                }, 300);
+            }
+        });
+
+        async function runGlobalSearch() {
+            if (!db || allTables.length === 0) {
+                showError('No database loaded');
+                return;
+            }
+
+            const query = document.getElementById('globalSearchInput').value.trim();
+            if (!query) {
+                clearGlobalSearch();
+                return;
+            }
+
+            if (isSearching) return;
+            isSearching = true;
+
+            const useFts = document.getElementById('globalSearchFts').checked;
+            const limitRows = document.getElementById('globalSearchLimit').checked;
+            const maxRows = limitRows ? 100 : 10000;
+
+            // Show progress
+            document.getElementById('searchProgress').style.display = 'flex';
+            document.getElementById('globalSearchSummary').style.display = 'none';
+            document.getElementById('globalSearchResults').innerHTML = '';
+            
+            const startTime = performance.now();
+            globalSearchResults = [];
+            let totalMatches = 0;
+            let tablesWithMatches = 0;
+
+            // Search each table
+            for (let i = 0; i < allTables.length; i++) {
+                const tableName = allTables[i];
+                const progress = ((i + 1) / allTables.length) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+                document.getElementById('progressText').textContent = `${i + 1}/${allTables.length}`;
+
+                try {
+                    let result;
+                    if (useFts) {
+                        result = await searchTableFts(tableName, query, maxRows);
+                    } else {
+                        result = await searchTableLike(tableName, query, maxRows);
+                    }
+
+                    if (result.matches > 0) {
+                        globalSearchResults.push(result);
+                        totalMatches += result.matches;
+                        tablesWithMatches++;
+                    }
+                } catch (err) {
+                    console.error(`Error searching ${tableName}:`, err);
+                }
+
+                // Small delay to allow UI update
+                if (i % 5 === 0) await new Promise(r => setTimeout(r, 1));
+            }
+
+            const endTime = performance.now();
+            const searchTime = Math.round(endTime - startTime);
+
+            // Hide progress
+            document.getElementById('searchProgress').style.display = 'none';
+            
+            // Show summary
+            document.getElementById('globalSearchSummary').style.display = 'flex';
+            document.getElementById('totalMatches').textContent = totalMatches.toLocaleString();
+            document.getElementById('tablesSearched').textContent = `${tablesWithMatches}/${allTables.length}`;
+            document.getElementById('searchTime').textContent = `${searchTime}ms`;
+
+            // Update badge
+            const badge = document.getElementById('globalSearchBadge');
+            if (totalMatches > 0) {
+                badge.textContent = totalMatches > 99 ? '99+' : totalMatches;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            // Render results
+            renderGlobalSearchResults(query);
+            isSearching = false;
+        }
+
+        function searchTableLike(tableName, query, maxRows) {
+            return new Promise((resolve) => {
+                try {
+                    // Get columns
+                    const colsRes = db.exec(`PRAGMA table_info("${tableName.replace(/"/g,'""')}")`);
+                    if (!colsRes.length || !colsRes[0].values.length) {
+                        resolve({ tableName, matches: 0, data: null });
+                        return;
+                    }
+
+                    const columns = colsRes[0].values.map(row => row[1]); // column name is at index 1
+                    const conditions = columns.map(c => `CAST("${c.replace(/"/g,'""')}" AS TEXT) LIKE ?`).join(' OR ');
+                    const params = columns.map(() => `%${query}%`);
+                    
+                    const sql = `SELECT * FROM "${tableName.replace(/"/g,'""')}" WHERE ${conditions} LIMIT ${maxRows}`;
+                    const res = db.exec(sql, params);
+
+                    if (res.length > 0 && res[0].values.length > 0) {
+                        resolve({
+                            tableName,
+                            matches: res[0].values.length,
+                            data: res[0],
+                            isLimited: res[0].values.length >= maxRows,
+                            columns: columns
+                        });
+                    } else {
+                        resolve({ tableName, matches: 0, data: null });
+                    }
+                } catch (err) {
+                    resolve({ tableName, matches: 0, data: null, error: err.message });
+                }
+            });
+        }
+
+        function searchTableFts(tableName, query, maxRows) {
+            return new Promise((resolve) => {
+                try {
+                    // First try to use existing FTS5 table if available
+                    const ftsTableName = tableName + '_fts';
+                    const checkRes = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${ftsTableName.replace(/'/g,"''")}'`);
+                    
+                    if (checkRes.length > 0 && checkRes[0].values.length > 0) {
+                        // Use existing FTS table
+                        const sql = `SELECT * FROM "${ftsTableName.replace(/"/g,'""')}" WHERE "${ftsTableName.replace(/"/g,'""')}" MATCH ? LIMIT ${maxRows}`;
+                        const res = db.exec(sql, [query]);
+                        
+                        if (res.length > 0 && res[0].values.length > 0) {
+                            resolve({
+                                tableName,
+                                matches: res[0].values.length,
+                                data: res[0],
+                                isLimited: res[0].values.length >= maxRows,
+                                isFts: true
+                            });
+                        } else {
+                            resolve({ tableName, matches: 0, data: null });
+                        }
+                    } else {
+                        // Fall back to LIKE search
+                        searchTableLike(tableName, query, maxRows).then(resolve);
+                    }
+                } catch (err) {
+                    // Fall back to LIKE search
+                    searchTableLike(tableName, query, maxRows).then(resolve);
+                }
+            });
+        }
+
+        function renderGlobalSearchResults(query) {
+            const container = document.getElementById('globalSearchResults');
+            
+            if (globalSearchResults.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">🔍</div>
+                        <div>No matches found for "<strong>${escapeHtml(query)}</strong>"</div>
+                        <div style="font-size:12px;margin-top:8px;opacity:0.7;">Try different keywords or check your spelling</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by match count descending
+            globalSearchResults.sort((a, b) => b.matches - a.matches);
+
+            let html = '';
+            globalSearchResults.forEach((result, index) => {
+                const isCollapsed = index > 0; // Collapse all except first
+                html += `
+                    <div class="table-result-group">
+                        <div class="table-result-header ${isCollapsed ? 'collapsed' : ''}" onclick="toggleResultGroup(this)">
+                            <div class="table-result-title">
+                                <span>📋 ${escapeHtml(result.tableName)}</span>
+                                <span class="table-result-count">${result.matches}${result.isLimited ? '+' : ''}</span>
+                                ${result.isFts ? '<span style="font-size:11px;background:var(--warning);color:#fff;padding:1px 6px;border-radius:10px;">FTS5</span>' : ''}
+                            </div>
+                            <div class="table-result-actions">
+                                <button class="btn btn-primary" onclick="event.stopPropagation();viewTableFromSearch('${result.tableName.replace(/'/g,"\\'")}')">View Table</button>
+                                <span style="font-size:12px;color:var(--text-secondary);transform:rotate(${isCollapsed ? '0deg' : '180deg'});transition:transform 0.2s;">▼</span>
+                            </div>
+                        </div>
+                        <div class="table-result-content ${isCollapsed ? 'collapsed' : ''}">
+                            ${renderResultTable(result.data, query)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderResultTable(data, query) {
+            if (!data || !data.columns || data.columns.length === 0) {
+                return '<div style="padding:20px;color:var(--text-secondary);">No data</div>';
+            }
+
+            const terms = query.split(/\s+/).filter(Boolean);
+            let html = '<table class="data-table"><thead><tr>';
+            data.columns.forEach(col => {
+                html += '<th>' + escapeHtml(col) + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+            
+            data.values.forEach(row => {
+                html += '<tr class="match-row">';
+                row.forEach(cell => {
+                    if (cell === null) {
+                        html += '<td><span style="color:var(--text-secondary);font-style:italic">NULL</span></td>';
+                    } else {
+                        let cellHtml = escapeHtml(String(cell));
+                        if (terms.length > 0) {
+                            cellHtml = highlightTerms(cellHtml, terms);
+                        }
+                        html += '<td>' + cellHtml + '</td>';
+                    }
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function toggleResultGroup(header) {
+            const content = header.nextElementSibling;
+            const arrow = header.querySelector('.table-result-actions span:last-child');
+            
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+            
+            if (content.classList.contains('collapsed')) {
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function viewTableFromSearch(tableName) {
+            selectTable(tableName);
+            // Clear the local search to show all data
+            document.getElementById('filterInput').value = '';
+        }
+
+        function clearGlobalSearch() {
+            document.getElementById('globalSearchInput').value = '';
+            document.getElementById('globalSearchResults').innerHTML = `
+                <div class="no-results">
+                    <div class="no-results-icon">🔍</div>
+                    <div>Enter a search term above to search across all tables</div>
+                    <div style="font-size:12px;margin-top:8px;opacity:0.7;">Results will appear here grouped by table</div>
+                </div>
+            `;
+            document.getElementById('globalSearchSummary').style.display = 'none';
+            document.getElementById('globalSearchBadge').style.display = 'none';
+            globalSearchResults = [];
+        }
+
+        // ── SEARCH ENGINE (Hybrid: SQL LIKE → FTS5) ───────────────────────
+        let searchTimer = null;
+        let ftsMode = false;
+        let ftsReady = false;
+        let ftsTable = null;
+
+        function onSearchInput() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(runSearch, 250);
+        }
+
+        function runSearch() {
+            const q = document.getElementById('filterInput').value.trim();
+            const badge = document.getElementById('search-mode-badge');
+            const status = document.getElementById('search-status');
+
+            if (!q) {
+                badge.style.display = 'none';
+                status.textContent = '';
+                if (currentTable) selectTable(currentTable, true);
+                return;
+            }
+
+            if (ftsMode && ftsReady) {
+                runFtsSearch(q);
+            } else {
+                runLikeSearch(q);
+            }
+        }
+
+        function runLikeSearch(q) {
+            if (!db || !currentTable) return;
+            const badge = document.getElementById('search-mode-badge');
+            const status = document.getElementById('search-status');
+            try {
+                const cols = currentData.columns;
+                if (!cols || cols.length === 0) return;
+
+                const conditions = cols.map(c => `CAST("${c.replace(/"/g,'""')}" AS TEXT) LIKE ?`).join(' OR ');
+                const params = cols.map(() => `%${q}%`);
+                const sql = `SELECT * FROM "${currentTable.replace(/"/g,'""')}" WHERE ${conditions} LIMIT 5000`;
+                const res = db.exec(sql, params);
+
+                badge.style.display = 'inline-block';
+                badge.textContent = 'SQL LIKE';
+                badge.style.background = 'rgba(59,130,246,0.12)';
+                badge.style.color = 'var(--accent)';
+
+                if (res.length > 0) {
+                    const data = res[0];
+                    renderTable(data, 'dataTableWrapper', q);
+                    status.textContent = `${data.values.length} match${data.values.length !== 1 ? 'es' : ''}`;
+                    document.getElementById('footerRows').textContent = data.values.length;
+                } else {
+                    document.getElementById('dataTableWrapper').innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-secondary);">No matches found</div>';
+                    status.textContent = '0 matches';
+                    document.getElementById('footerRows').textContent = '0';
+                }
+            } catch(err) {
+                showError('Search error: ' + err.message);
+            }
+        }
+
+        function toggleFtsMode() {
+            if (!db || !currentTable) { showError('Load a database and select a table first.'); return; }
+            ftsMode = !ftsMode;
+            const btn = document.getElementById('ftsToggleBtn');
+            const infoBar = document.getElementById('fts-info-bar');
+
+            if (ftsMode) {
+                btn.classList.add('btn-wrap-active');
+                btn.textContent = '⚡ FTS5 ON';
+                infoBar.style.display = 'flex';
+                buildFtsIndex();
+            } else {
+                btn.classList.remove('btn-wrap-active');
+                btn.textContent = '⚡ FTS5';
+                infoBar.style.display = 'none';
+                ftsReady = false;
+                dropFtsIndex();
+                const q = document.getElementById('filterInput').value.trim();
+                if (q) runLikeSearch(q); else selectTable(currentTable, true);
+            }
+        }
+
+        function buildFtsIndex() {
+            if (!db || !currentTable) return;
+            const buildStatus = document.getElementById('fts-build-status');
+            buildStatus.textContent = '⏳ Building index…';
+            ftsReady = false;
+
+            setTimeout(() => {
+                try {
+                    dropFtsIndex();
+                    ftsTable = '_fts5_' + currentTable.replace(/\W/g,'_');
+                    const cols = currentData.columns;
+                    const colDefs = cols.map(c => `"${c.replace(/"/g,'""')}"`).join(', ');
+                    const colList = cols.map(c => `CAST("${c.replace(/"/g,'""')}" AS TEXT)`).join(', ');
+
+                    db.run(`CREATE VIRTUAL TABLE IF NOT EXISTS "${ftsTable}" USING fts5(${colDefs})`);
+                    db.run(`INSERT INTO "${ftsTable}" SELECT ${colList} FROM "${currentTable.replace(/"/g,'""')}"`);
+
+                    ftsReady = true;
+                    const rowCount = currentData.values.length;
+                    buildStatus.textContent = `✓ Indexed ${rowCount.toLocaleString()} rows`;
+                    setTimeout(() => { buildStatus.textContent = ''; }, 3000);
+
+                    const q = document.getElementById('filterInput').value.trim();
+                    if (q) runFtsSearch(q);
+                } catch(err) {
+                    buildStatus.textContent = '✗ FTS5 error: ' + err.message;
+                    ftsMode = false;
+                    ftsReady = false;
+                    document.getElementById('ftsToggleBtn').classList.remove('btn-wrap-active');
+                    document.getElementById('ftsToggleBtn').textContent = '⚡ FTS5';
+                    document.getElementById('fts-info-bar').style.display = 'none';
+                }
+            }, 30);
+        }
+
+        function dropFtsIndex() {
+            if (ftsTable && db) {
+                try { db.run(`DROP TABLE IF EXISTS "${ftsTable}"`); } catch(e) {}
+                ftsTable = null;
+            }
+        }
+
+        function runFtsSearch(q) {
+            if (!db || !ftsReady || !ftsTable) return;
+            const badge = document.getElementById('search-mode-badge');
+            const status = document.getElementById('search-status');
+            try {
+                const cols = currentData.columns;
+                const colSelect = cols.map(c => `t."${c.replace(/"/g,'""')}"`).join(', ');
+
+                const sql = `
+                    SELECT ${colSelect}
+                    FROM "${currentTable.replace(/"/g,'""')}" t
+                    JOIN "${ftsTable}" f ON f.rowid = t.rowid
+                    WHERE "${ftsTable}" MATCH ?
+                    ORDER BY f.rank
+                    LIMIT 5000
+                `;
+                const res = db.exec(sql, [q]);
+
+                badge.style.display = 'inline-block';
+                badge.textContent = '⚡ FTS5';
+                badge.style.background = 'rgba(251,191,36,0.15)';
+                badge.style.color = '#d97706';
+
+                if (res.length > 0) {
+                    const data = res[0];
+                    renderTable(data, 'dataTableWrapper', extractFtsTerms(q));
+                    status.textContent = `${data.values.length} match${data.values.length !== 1 ? 'es' : ''} · ranked`;
+                    document.getElementById('footerRows').textContent = data.values.length;
+                } else {
+                    document.getElementById('dataTableWrapper').innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-secondary);">No FTS5 matches found</div>';
+                    status.textContent = '0 matches';
+                    document.getElementById('footerRows').textContent = '0';
+                }
+            } catch(err) {
+                document.getElementById('dataTableWrapper').innerHTML =
+                    `<div style="padding:20px 30px;color:#dc2626;font-size:13px;">
+                        <strong>FTS5 syntax error:</strong> ${escapeHtml(err.message)}<br>
+                        <span style="color:var(--text-secondary);font-size:12px;margin-top:6px;display:block;">
+                            Tips: use <code>"phrase"</code> for exact phrases, <code>word*</code> for prefix, <code>AND / OR / NOT</code> for boolean
+                        </span>
+                    </div>`;
+                status.textContent = 'Syntax error';
+            }
+        }
+
+        function extractFtsTerms(q) {
+            return q.replace(/AND|OR|NOT|["\*\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function resetFts() {
+            if (ftsMode) {
+                dropFtsIndex();
+                ftsReady = false;
+                document.getElementById('fts-build-status').textContent = '';
+                if (ftsMode) buildFtsIndex();
+            }
+            document.getElementById('filterInput').value = '';
+            document.getElementById('search-mode-badge').style.display = 'none';
+            document.getElementById('search-status').textContent = '';
+        }
+
+        function highlightTerms(escapedHtml, terms) {
+            if (!terms || terms.length === 0) return escapedHtml;
+            let result = escapedHtml;
+            terms.forEach(term => {
+                if (!term) return;
+                const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '\\w*');
+                try {
+                    result = result.replace(new RegExp(`(${escaped})`, 'gi'),
+                        '<mark>$1</mark>');
+                } catch(e) {}
+            });
+            return result;
+        }
+
+        let wrapText = false;
+        function toggleWrapText() {
+            wrapText = !wrapText;
+            const tables = document.querySelectorAll('#dataTableWrapper .data-table, #queryResult .data-table, .global-search-results .data-table');
+            tables.forEach(t => t.classList.toggle('wrap-text', wrapText));
+            const btn = document.getElementById('wrapToggleBtn');
+            btn.classList.toggle('btn-wrap-active', wrapText);
+            btn.textContent = wrapText ? '⇌ Unwrap' : '⇌ Wrap Text';
+        }
+
+        function exportCSV() {
+            if (!currentData || !currentData.columns) return;
+            let csv = currentData.columns.map(c => '"' + c.replace(/"/g, '""') + '"').join(',') + '\n';
+            currentData.values.forEach(row => {
+                csv += row.map(cell => {
+                    if (cell === null) return '';
+                    return '"' + String(cell).replace(/"/g, '""') + '"';
+                }).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (currentTable || 'export') + '.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showError(msg) {
+            const div = document.createElement('div');
+            div.className = 'error-msg';
+            div.textContent = msg;
+            document.querySelector('.content-area').prepend(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        // Start auth flow
+        initAuth();
+    </script>
+</body>
+</html>
